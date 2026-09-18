@@ -15,7 +15,7 @@
 
   <div class="max-w-6xl mx-auto space-y-4">
     
-    <!-- Top Bar / Header (ယခင်ဒီဇိုင်းအတိုင်း) -->
+    <!-- Top Bar / Header -->
     <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-3">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center text-gray-900 text-xl font-bold shadow-sm">
@@ -74,7 +74,7 @@
       
       <form id="orderForm" onsubmit="addOrder(event)" class="space-y-3.5 text-xs">
         
-        <!-- Goldsmith Selection (ပန်းထိမ်ဆရာ ရွေးရန်) -->
+        <!-- Goldsmith Selection -->
         <div>
           <label class="block font-bold text-gray-700 mb-1.5">အပ်ထည်ပြုလုပ်မည့် ပန်းထိမ်ဆရာ ရွေးပါ *</label>
           <div class="grid grid-cols-3 gap-2">
@@ -124,7 +124,7 @@
         </div>
 
         <div class="text-right pt-2">
-          <button type="submit" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold px-6 py-2.5 rounded-xl shadow-md transition-all active:scale-95 text-xs">
+          <button id="submitBtn" type="submit" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold px-6 py-2.5 rounded-xl shadow-md transition-all active:scale-95 text-xs">
             <i class="fas fa-save mr-1"></i> စာရင်းသစ် ထည့်သွင်းမည်
           </button>
         </div>
@@ -156,7 +156,7 @@
             </tr>
           </thead>
           <tbody id="orderTableBody" class="divide-y divide-gray-100">
-            <!-- Table Rows Generated Here -->
+            <!-- Table Rows -->
           </tbody>
         </table>
       </div>
@@ -168,13 +168,51 @@
     let orders = JSON.parse(localStorage.getItem('jewelry_orders') || '[]');
     document.getElementById('orderDate').valueAsDate = new Date();
 
+    // ဓာတ်ပုံအရွယ်အစားကို အလိုအလျောက် သေးငယ်သွားအောင် ချုံ့ပေးသည့် function
+    function compressImage(file, callback) {
+      const maxWidth = 500; // ပုံရဲ့ အကျယ်ကို 500px အထိပဲ ချုံ့မည်
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = function(event) {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Quality ကို 0.6 (60%) ထိ လျှော့ချပြီး MB နည်းသွားအောင် လုပ်သည်
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          callback(compressedDataUrl);
+        };
+      };
+    }
+
     function saveOrders() {
-      localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+      try {
+        localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+      } catch (e) {
+        alert("ဖုန်း Local Storage ပြည့်နေပါသဖြင့် စာရင်းအဟောင်းအချို့ကို ဖျက်ပေးပါရန်။");
+      }
       renderOrders();
     }
 
     function addOrder(e) {
       e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> ခဏစောင့်ပါ...`;
+
       const fileInput = document.getElementById('itemPhoto');
       const file = fileInput.files[0];
       const smithName = document.querySelector('input[name="smithName"]:checked').value;
@@ -191,21 +229,24 @@
         photo: ''
       };
 
+      const resetFormAndBtn = () => {
+        document.getElementById('orderForm').reset();
+        document.getElementById('orderDate').valueAsDate = new Date();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="fas fa-save mr-1"></i> စာရင်းသစ် ထည့်သွင်းမည်`;
+      };
+
       if (file) {
-        const reader = new FileReader();
-        reader.onloadend = function() {
-          newOrder.photo = reader.result;
+        compressImage(file, function(compressedBase64) {
+          newOrder.photo = compressedBase64;
           orders.unshift(newOrder);
           saveOrders();
-          document.getElementById('orderForm').reset();
-          document.getElementById('orderDate').valueAsDate = new Date();
-        };
-        reader.readAsDataURL(file);
+          resetFormAndBtn();
+        });
       } else {
         orders.unshift(newOrder);
         saveOrders();
-        document.getElementById('orderForm').reset();
-        document.getElementById('orderDate').valueAsDate = new Date();
+        resetFormAndBtn();
       }
     }
 
